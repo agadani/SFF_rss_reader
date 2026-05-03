@@ -28,7 +28,7 @@ const FICTION_FILTERS = {
     ],
   },
   'beneath-ceaseless-skies.com': {
-    mode: 'allowall', // /stories/feed/ is fiction-only
+    mode: 'allowall', // /stories/feed/ is fiction-only, as of 5/2026
   },
   'clarkesworldmagazine.com': {
     mode: 'allowlist',
@@ -70,7 +70,7 @@ const SKIP_KEYWORDS = [
 ];
 
 // Reader mode: per-site CSS selectors for content extraction.
-// Each magazine has a different HTML structure.
+// Each magazine has a different HTML structure.  The Internet is terrible.
 
 const SITE_SELECTORS = {
   'clarkesworldmagazine.com': {
