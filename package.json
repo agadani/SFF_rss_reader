@@ -1,0 +1,22 @@
+{
+  "name": "scifi-feed-workers",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers version of Sci-Fi Stories Feed with no client-side JavaScript",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "science-fiction",
+    "no-javascript",
+    "server-side-rendering"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

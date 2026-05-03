@@ -1,0 +1,14 @@
+name = "scifi-feed"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Optional: Add KV namespace for caching
+# Uncomment and create a KV namespace to enable caching
+# kv_namespaces = [
+#   { binding = "STORY_CACHE", id = "your-kv-namespace-id" }
+# ]
+
+# Optional: Custom domain
+# routes = [
+#   { pattern = "scifi-feed.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
