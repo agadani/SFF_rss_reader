@@ -1,0 +1,23 @@
+worker.js
+  a252f81ee3bba260 315-321,324-326,330-343,346-352,355-360,362-368,371-372,377-380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "b9541b8275879073fce755cae3ffbd68c341201e",
+  "prompts": {
+    "a252f81ee3bba260": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_214cab3f4ffeDO9bNjty4nFjmO",
+        "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6"
+      },
+      "human_author": "avani",
+      "messages": [],
+      "total_additions": 55,
+      "total_deletions": 16,
+      "accepted_lines": 55,
+      "overriden_lines": 0
+    }
+  }
+}
