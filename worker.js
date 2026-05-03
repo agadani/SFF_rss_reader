@@ -312,33 +312,72 @@ async function extractContent(html, storyUrl) {
 }
 
 async function extractWithStrategy(html, strategy) {
-  // Lightspeed's author is inside p.postmetadata which gets stripped
-  let author = '';
-  if (strategy.authorPreStrip && strategy.author) {
-    author = await extractTextViaMarker(html, strategy.author);
-  }
+  // Do everything in a single HTMLRewriter pass: strip junk, mark content
+  // boundaries, and mark title/author boundaries. This avoids streaming the
+  // full HTML multiple times, which can exceed CF's CPU time limit on deploy.
+  const CS = '<!--CS-->', CE = '<!--CE-->';
+  const TS = '<!--TS-->', TE = '<!--TE-->';
+  const AS = '<!--AS-->', AE = '<!--AE-->';
+  let contentMarked = false, titleMarked = false, authorMarked = false;
 
-  const stripSelectors = [...ALWAYS_STRIP, ...(strategy.strip || [])];
   let rewriter = new HTMLRewriter();
-  for (const sel of stripSelectors) {
+
+  // Strip unwanted elements
+  for (const sel of [...ALWAYS_STRIP, ...(strategy.strip || [])]) {
     rewriter = rewriter.on(sel, { element(el) { el.remove(); } });
   }
-  const stripped = await rewriter.transform(new Response(html)).text();
 
-  const content = await extractHTMLViaMarker(stripped, strategy.content);
-  let title = strategy.title ? await extractTextViaMarker(stripped, strategy.title) : '';
-  if (!author && strategy.author && !strategy.authorPreStrip) {
-    author = await extractTextViaMarker(stripped, strategy.author);
+  // Mark content container
+  rewriter = rewriter.on(strategy.content, {
+    element(el) {
+      if (!contentMarked) { contentMarked = true; el.prepend(CS, { html: true }); el.append(CE, { html: true }); }
+    },
+  });
+
+  // Mark title element
+  if (strategy.title) {
+    rewriter = rewriter.on(strategy.title, {
+      element(el) {
+        if (!titleMarked) { titleMarked = true; el.prepend(TS, { html: true }); el.append(TE, { html: true }); }
+      },
+    });
   }
 
-  title = cleanTitle(title);
-  author = stripHTML(author).replace(/^by\s+/i, '').trim();
+  // Mark author element (skip if authorPreStrip — we'll grab it separately)
+  if (strategy.author && !strategy.authorPreStrip) {
+    rewriter = rewriter.on(strategy.author, {
+      element(el) {
+        if (!authorMarked) { authorMarked = true; el.prepend(AS, { html: true }); el.append(AE, { html: true }); }
+      },
+    });
+  }
+
+  const out = await rewriter.transform(new Response(html)).text();
+
+  // Slice content, title, author from the marked-up output
+  let content = sliceBetween(out, CS, CE);
+  let title = cleanTitle(sliceBetween(out, TS, TE));
+  let author = '';
+
+  if (strategy.authorPreStrip && strategy.author) {
+    // Lightspeed: author is inside an element we strip, so run one
+    // small targeted pass on the original HTML just for the author
+    author = await extractTextViaMarker(html, strategy.author);
+  } else {
+    author = stripHTML(sliceBetween(out, AS, AE)).replace(/^by\s+/i, '').trim();
+  }
 
   // regex fallbacks if selectors didn't match
-  if (!title) title = cleanTitle(regexFallback(stripped, [/<h1[^>]*>(.*?)<\/h1>/i, /<title>(.*?)<\/title>/i]));
-  if (!author) author = regexFallback(stripped, [/<span[^>]*class="[^"]*author[^"]*"[^>]*>(.*?)<\/span>/i, /<a[^>]*rel="author"[^>]*>(.*?)<\/a>/i]).replace(/^by\s+/i, '').trim();
+  if (!title) title = cleanTitle(regexFallback(out, [/<h1[^>]*>(.*?)<\/h1>/i, /<title>(.*?)<\/title>/i]));
+  if (!author) author = regexFallback(out, [/<span[^>]*class="[^"]*author[^"]*"[^>]*>(.*?)<\/span>/i, /<a[^>]*rel="author"[^>]*>(.*?)<\/a>/i]).replace(/^by\s+/i, '').trim();
 
   return { title, author, content };
+}
+
+function sliceBetween(str, startMarker, endMarker) {
+  const si = str.indexOf(startMarker), ei = str.indexOf(endMarker);
+  if (si === -1 || ei === -1) return '';
+  return str.slice(si + startMarker.length, ei);
 }
 
 function cleanTitle(t) {
