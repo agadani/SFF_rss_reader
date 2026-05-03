@@ -1,8 +1,8 @@
 # SFF Short Stories Feed
 
-RSS aggregator for sci-fi/fantasy short fiction magazines, running on Cloudflare Workers. No client-side JS — everything renders server-side at the edge.
+RSS aggregator for sci-fi/fantasy short fiction magazines, running on Cloudflare Workers. No client-side JS.
 
-Pulls from Uncanny, Clarkesworld, Lightspeed, Strange Horizons, Beneath Ceaseless Skies, Apex, Escape Pod, and PodCastle. Filters out non-fiction using RSS category tags, then shuffles and paginates.
+Pulls from Uncanny, Clarkesworld, Lightspeed, Strange Horizons, Beneath Ceaseless Skies, Apex, Escape Pod, and PodCastle. Filters out non-fiction using RSS category tags, then shuffles and paginates.  Currently deployed at [https://scifi-feed.readsff.workers.dev/](https://scifi-feed.readsff.workers.dev/).
 
 Includes a reader mode that fetches story pages and extracts clean content using [HTMLRewriter](https://developers.cloudflare.com/workers/runtime-apis/html-rewriter/).
 
