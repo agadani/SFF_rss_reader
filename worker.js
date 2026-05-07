@@ -136,6 +136,9 @@ const SITE_SELECTORS = {
   },
 };
 
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#0a0a0f"/><defs><linearGradient id="g" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00f5ff"/><stop offset="100%" stop-color="#ff006e" stop-opacity="0"/></linearGradient></defs><circle cx="72" cy="28" r="14" fill="#00f5ff"/><circle cx="72" cy="28" r="20" fill="#00f5ff" opacity="0.15"/><path d="M64 36 L12 80" stroke="url(#g)" stroke-width="10" stroke-linecap="round"/></svg>`;
+const FAVICON_LINK = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(FAVICON_SVG)}">`;
+
 const FALLBACK_SELECTORS = [
   { content: 'div.entry-content', title: 'h1.entry-title', author: 'span.author' },
   { content: 'div.post-content',  title: 'h1.post-title',  author: 'a[rel="author"]' },
@@ -152,6 +155,11 @@ const ALWAYS_STRIP = [
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/favicon.ico') {
+      return new Response(FAVICON_SVG, {
+        headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' },
+      });
+    }
     if (url.pathname === '/reader') return handleReaderMode(url, env);
     return handleMainFeed(url, env);
   },
@@ -479,6 +487,7 @@ function generateMainHTML(stories, page, nextPage, hasMore, totalStories, select
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>READ MORE SFF</title>
+  ${FAVICON_LINK}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
@@ -539,6 +548,7 @@ function generateReaderHTML(title, author, content, originalUrl) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHTML(title || 'Reader Mode')} // SFF</title>
+  ${FAVICON_LINK}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
@@ -570,6 +580,7 @@ function generateErrorHTML(url, error) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reader Error // SFF</title>
+  ${FAVICON_LINK}
   ${getSharedCSS()}
   ${getReaderCSS()}
 </head>
