@@ -160,7 +160,7 @@ export default {
         headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' },
       });
     }
-    if (url.pathname === '/reader') return handleReaderMode(url, env);
+    if (url.pathname === '/reader') return handleReaderMode(url);
     return handleMainFeed(url, env);
   },
 };
@@ -193,6 +193,8 @@ async function handleReaderMode(url) {
   const storyUrl = url.searchParams.get('url');
   if (!storyUrl) return Response.redirect(new URL('/', url.origin).toString(), 302);
 
+  const backUrl = sanitizeBackUrl(url.searchParams.get('from'));
+
   try {
     const response = await fetch(storyUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ReaderMode/1.0)' },
@@ -201,14 +203,24 @@ async function handleReaderMode(url) {
 
     const html = await response.text();
     const { title, author, content } = await extractContent(html, storyUrl);
-    if (!content) return generateErrorHTML(storyUrl, 'Could not extract story content. Try reading on the original site.');
+    if (!content) return generateErrorHTML(storyUrl, 'Could not extract story content. Try reading on the original site.', backUrl);
 
-    return new Response(generateReaderHTML(title, author, content, storyUrl), {
+    return new Response(generateReaderHTML(title, author, content, storyUrl, backUrl), {
       headers: { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'public, max-age=3600' },
     });
   } catch (error) {
-    return generateErrorHTML(storyUrl, error.message);
+    return generateErrorHTML(storyUrl, error.message, backUrl);
   }
+}
+
+// Only allow same-origin relative back URLs (must start with '/' but not '//' to avoid protocol-relative).
+function sanitizeBackUrl(raw) {
+  if (!raw) return '/';
+  if (typeof raw !== 'string') return '/';
+  if (!raw.startsWith('/')) return '/';
+  if (raw.startsWith('//')) return '/';
+  if (raw.length > 500) return '/';
+  return raw;
 }
 
 async function getAllStories(env, selectedFeeds) {
@@ -459,8 +471,14 @@ function escapeHTML(text) {
 }
 
 function generateMainHTML(stories, page, nextPage, hasMore, totalStories, selectedFeeds = []) {
+  // Build the back URL that reader mode will return to: preserves page + filters,
+  // and #story-N so the user lands on the same card they were reading.
+  const feedQS = selectedFeeds.length ? '&' + selectedFeeds.map(f => 'feeds=' + f).join('&') : '';
+  const backBase = `/?page=${page}${feedQS}`;
+
   const storyCards = stories.map((s, i) => {
     const n = i + 1 + (page - 1) * 5;
+    const fromParam = encodeURIComponent(`${backBase}#story-${n}`);
     return `
     <article class="story-card" id="story-${n}">
       <div class="story-meta">
@@ -473,13 +491,11 @@ function generateMainHTML(stories, page, nextPage, hasMore, totalStories, select
       </h2>
       ${s.description ? `<p class="story-description">${escapeHTML(s.description)}</p>` : ''}
       <div class="story-actions">
-        <a href="/reader?url=${encodeURIComponent(s.link)}" class="reader-link">Reader Mode</a>
+        <a href="/reader?url=${encodeURIComponent(s.link)}&from=${fromParam}" class="reader-link">Reader Mode</a>
         <a href="${escapeHTML(s.link)}" class="read-link" target="_blank" rel="noopener noreferrer">Read Story</a>
       </div>
     </article>`;
   }).join('');
-
-  const feedQS = selectedFeeds.length ? '&' + selectedFeeds.map(f => 'feeds=' + f).join('&') : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -541,7 +557,7 @@ function generateMainHTML(stories, page, nextPage, hasMore, totalStories, select
 </html>`;
 }
 
-function generateReaderHTML(title, author, content, originalUrl) {
+function generateReaderHTML(title, author, content, originalUrl, backUrl = '/') {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -558,7 +574,7 @@ function generateReaderHTML(title, author, content, originalUrl) {
 <body>
   <header class="reader-header">
     <nav class="reader-nav">
-      <a href="/" class="back-link">Back to Feed</a>
+      <a href="${escapeHTML(backUrl)}" class="back-link">Back to Feed</a>
       <a href="${escapeHTML(originalUrl)}" class="original-link" target="_blank" rel="noopener noreferrer">View Original</a>
     </nav>
   </header>
@@ -573,7 +589,7 @@ function generateReaderHTML(title, author, content, originalUrl) {
 </html>`;
 }
 
-function generateErrorHTML(url, error) {
+function generateErrorHTML(url, error, backUrl = '/') {
   return new Response(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -593,7 +609,7 @@ function generateErrorHTML(url, error) {
       <strong>Error:</strong> ${escapeHTML(error)}
     </div>
     <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
-      <a href="/" style="display:inline-flex; padding:12px 24px; background:#00f5ff; color:#0a0a0f; text-decoration:none; border-radius:2px; font-family:'Space Mono',monospace; font-size:0.8rem; text-transform:uppercase;">\u2190 Back to Feed</a>
+      <a href="${escapeHTML(backUrl)}" style="display:inline-flex; padding:12px 24px; background:#00f5ff; color:#0a0a0f; text-decoration:none; border-radius:2px; font-family:'Space Mono',monospace; font-size:0.8rem; text-transform:uppercase;">\u2190 Back to Feed</a>
       ${url ? `<a href="${escapeHTML(url)}" target="_blank" style="display:inline-flex; padding:12px 24px; color:#ff006e; border:1px solid #ff006e; text-decoration:none; border-radius:2px; font-family:'Space Mono',monospace; font-size:0.8rem; text-transform:uppercase;">View Original \u2197</a>` : ''}
     </div>
   </div>
