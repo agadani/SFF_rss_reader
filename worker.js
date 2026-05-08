@@ -165,21 +165,29 @@ export default {
   },
 };
 
+const PER_PAGE_OPTIONS = [5, 10, 20, 50];
+const DEFAULT_PER_PAGE = 5;
+
+function parsePerPage(raw) {
+  const n = parseInt(raw, 10);
+  return PER_PAGE_OPTIONS.includes(n) ? n : DEFAULT_PER_PAGE;
+}
+
 async function handleMainFeed(url, env) {
   try {
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+    const perPage = parsePerPage(url.searchParams.get('perPage'));
     const selectedFeeds = url.searchParams.has('feeds')
       ? url.searchParams.getAll('feeds')
       : RSS_FEEDS.map((_, i) => i.toString());
 
     const allStories = await getAllStories(env, selectedFeeds);
-    const perPage = 5;
     const start = (page - 1) * perPage;
     const stories = allStories.slice(start, start + perPage);
     const hasMore = start + perPage < allStories.length;
 
     return new Response(
-      generateMainHTML(stories, page, hasMore ? page + 1 : null, hasMore, allStories.length, selectedFeeds),
+      generateMainHTML(stories, page, hasMore ? page + 1 : null, hasMore, allStories.length, selectedFeeds, perPage),
       { headers: { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'public, max-age=300' } },
     );
   } catch (error) {
@@ -512,14 +520,15 @@ function escapeHTML(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-function generateMainHTML(stories, page, nextPage, hasMore, totalStories, selectedFeeds = []) {
-  // Build the back URL that reader mode will return to: preserves page + filters,
+function generateMainHTML(stories, page, nextPage, hasMore, totalStories, selectedFeeds = [], perPage = DEFAULT_PER_PAGE) {
+  // Build the back URL that reader mode will return to: preserves page, perPage, filters,
   // and #story-N so the user lands on the same card they were reading.
   const feedQS = selectedFeeds.length ? '&' + selectedFeeds.map(f => 'feeds=' + f).join('&') : '';
-  const backBase = `/?page=${page}${feedQS}`;
+  const perPageQS = perPage !== DEFAULT_PER_PAGE ? `&perPage=${perPage}` : '';
+  const backBase = `/?page=${page}${perPageQS}${feedQS}`;
 
   const storyCards = stories.map((s, i) => {
-    const n = i + 1 + (page - 1) * 5;
+    const n = i + 1 + (page - 1) * perPage;
     const fromParam = encodeURIComponent(`${backBase}#story-${n}`);
     return `
     <article class="story-card" id="story-${n}">
@@ -569,7 +578,7 @@ function generateMainHTML(stories, page, nextPage, hasMore, totalStories, select
       ${hasMore ? `
       <div class="page-marker">\u2014 PAGE ${page} \u2014</div>
       <div class="load-more">
-        <a href="/?page=${nextPage}${feedQS}#story-${page * 5 + 1}" class="load-btn">Load More Stories</a>
+        <a href="/?page=${nextPage}${perPageQS}${feedQS}#story-${page * perPage + 1}" class="load-btn">Load More Stories</a>
       </div>` : `
       <div class="page-marker">\u2014 END OF FEED \u2014</div>`}
     </main>
@@ -584,6 +593,14 @@ function generateMainHTML(stories, page, nextPage, hasMore, totalStories, select
               <input type="checkbox" name="feeds" value="${i}" ${selectedFeeds.includes(i.toString()) ? 'checked' : ''}>
               <span>${feed.name.toUpperCase().replace(/ /g, '_')}</span>
             </label>`).join('')}
+        </div>
+        <div class="filter-header"><span>STORIES_PER_PAGE:</span></div>
+        <div class="per-page-row">
+          <label class="per-page-label">
+            <select name="perPage" class="per-page-select">
+              ${PER_PAGE_OPTIONS.map(n => `<option value="${n}"${n === perPage ? ' selected' : ''}>${n}</option>`).join('')}
+            </select>
+          </label>
         </div>
         <button type="submit" class="filter-submit">UPDATE_FEED</button>
       </form>
@@ -743,6 +760,11 @@ function getMainCSS() {
   .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--blue); }
   .filter-submit { margin-top: 16px; padding: 10px 24px; background: var(--blue); color: var(--bg); border: none; border-radius: 4px; font-family: 'Space Mono', monospace; font-size: 0.85rem; font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
   .filter-submit:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,245,255,0.3); }
+  .feed-filter > .filter-header:not(:first-child) { margin-top: 24px; }
+  .per-page-row { display: flex; justify-content: center; }
+  .per-page-label { display: inline-flex; align-items: center; gap: 12px; font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--text); }
+  .per-page-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 28px 6px 10px; font-family: 'Space Mono', monospace; font-size: 0.85rem; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--blue) 50%), linear-gradient(135deg, var(--blue) 50%, transparent 50%); background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  .per-page-select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 2px rgba(0,245,255,0.25); }
   .footer-links { display: flex; justify-content: center; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
 
   @media (max-width: 768px) {
